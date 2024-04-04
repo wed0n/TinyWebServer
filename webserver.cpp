@@ -97,13 +97,11 @@ void WebServer::eventListen() {
   assert(m_listenfd >= 0);
 
   //优雅关闭连接
+  struct linger linger_val = {1, 1};
   if (0 == m_OPT_LINGER) {
-    struct linger tmp = {0, 1};
-    setsockopt(m_listenfd, SOL_SOCKET, SO_LINGER, &tmp, sizeof(tmp));
-  } else if (1 == m_OPT_LINGER) {
-    struct linger tmp = {1, 1};
-    setsockopt(m_listenfd, SOL_SOCKET, SO_LINGER, &tmp, sizeof(tmp));
+    linger_val.l_onoff = 0;
   }
+  setsockopt(m_listenfd, SOL_SOCKET, SO_LINGER, &linger_val, sizeof(linger_val));
 
   int ret = 0;
   struct sockaddr_in address;
