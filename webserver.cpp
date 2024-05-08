@@ -1,5 +1,9 @@
 #include "webserver.h"
 
+#include <sys/epoll.h>
+
+#include "log/log.h"
+
 WebServer::WebServer() {
   // http_conn类对象
   users = new http_conn[MAX_FD];
@@ -79,7 +83,7 @@ void WebServer::log_write() {
 void WebServer::sql_pool() {
   //初始化数据库连接池
   m_connPool = connection_pool::GetInstance();
-  m_connPool->init("localhost", m_user, m_passWord, m_databaseName, 3306,
+  m_connPool->init("192.168.1.66", m_user, m_passWord, m_databaseName, 3306,
                    m_sql_num, m_close_log);
 
   //初始化数据库读取表
@@ -101,7 +105,8 @@ void WebServer::eventListen() {
   if (0 == m_OPT_LINGER) {
     linger_val.l_onoff = 0;
   }
-  setsockopt(m_listenfd, SOL_SOCKET, SO_LINGER, &linger_val, sizeof(linger_val));
+  setsockopt(m_listenfd, SOL_SOCKET, SO_LINGER, &linger_val,
+             sizeof(linger_val));
 
   int ret = 0;
   struct sockaddr_in address;
@@ -151,7 +156,7 @@ void WebServer::timer(int connfd, struct sockaddr_in client_address) {
   //创建定时器，设置回调函数和超时时间，绑定用户数据，将定时器添加到链表中
   users_timer[connfd].address = client_address;
   users_timer[connfd].sockfd = connfd;
-  util_timer *timer = new util_timer;
+  util_timer *timer = new util_timer();
   timer->user_data = &users_timer[connfd];
   timer->cb_func = cb_func;
   time_t cur = time(NULL);
@@ -328,28 +333,29 @@ void WebServer::eventLoop() {
       LOG_ERROR("%s", "epoll failure");
       break;
     }
-
+    LOG_DEBUG("epoll_wait %d", number);
     for (int i = 0; i < number; i++) {
-      int sockfd = events[i].data.fd;
+      const auto &eventItem = events[i];
+      int sockfd = eventItem.data.fd;
 
       //处理新到的客户连接
       if (sockfd == m_listenfd) {
         bool flag = dealclientdata();
         if (false == flag) continue;
-      } else if (events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) {
+      } else if (eventItem.events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) {
         //服务器端关闭连接，移除对应的定时器
         util_timer *timer = users_timer[sockfd].timer;
         deal_timer(timer, sockfd);
       }
       //处理信号
-      else if ((sockfd == m_pipefd[0]) && (events[i].events & EPOLLIN)) {
+      else if ((sockfd == m_pipefd[0]) && (eventItem.events & EPOLLIN)) {
         bool flag = dealwithsignal(timeout, stop_server);
         if (false == flag) LOG_ERROR("%s", "dealclientdata failure");
       }
       //处理客户连接上接收到的数据
-      else if (events[i].events & EPOLLIN) {
+      else if (eventItem.events & EPOLLIN) {
         dealwithread(sockfd);
-      } else if (events[i].events & EPOLLOUT) {
+      } else if (eventItem.events & EPOLLOUT) {
         dealwithwrite(sockfd);
       }
     }

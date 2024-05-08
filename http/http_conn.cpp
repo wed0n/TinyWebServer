@@ -61,15 +61,12 @@ int setnonblocking(int fd) {
 void addfd(int epollfd, int fd, bool one_shot, int TRIGMode) {
   epoll_event event;
   event.data.fd = fd;
-
-  if (1 == TRIGMode)
-    event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
-  else
-    event.events = EPOLLIN | EPOLLRDHUP;
-
+  event.events = EPOLLIN | EPOLLRDHUP;
+  if (1 == TRIGMode) event.events |= EPOLLET;
   if (one_shot) event.events |= EPOLLONESHOT;
-  epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &event);
+
   setnonblocking(fd);
+  epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &event);
 }
 
 //从内核时间表删除描述符
@@ -82,11 +79,8 @@ void removefd(int epollfd, int fd) {
 void modfd(int epollfd, int fd, int ev, int TRIGMode) {
   epoll_event event;
   event.data.fd = fd;
-
-  if (1 == TRIGMode)
-    event.events = ev | EPOLLET | EPOLLONESHOT | EPOLLRDHUP;
-  else
-    event.events = ev | EPOLLONESHOT | EPOLLRDHUP;
+  event.events = ev | EPOLLONESHOT | EPOLLRDHUP;
+  if (1 == TRIGMode) event.events |= EPOLLET;
 
   epoll_ctl(epollfd, EPOLL_CTL_MOD, fd, &event);
 }

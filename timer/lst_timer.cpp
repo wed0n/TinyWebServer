@@ -133,15 +133,12 @@ int Utils::setnonblocking(int fd) {
 void Utils::addfd(int epollfd, int fd, bool one_shot, int TRIGMode) {
   epoll_event event;
   event.data.fd = fd;
-
-  if (1 == TRIGMode)
-    event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
-  else
-    event.events = EPOLLIN | EPOLLRDHUP;
-
+  event.events = EPOLLIN | EPOLLRDHUP;
+  if (1 == TRIGMode) event.events |= EPOLLET;
   if (one_shot) event.events |= EPOLLONESHOT;
-  epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &event);
+
   setnonblocking(fd);
+  epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &event);
 }
 
 //信号处理函数
